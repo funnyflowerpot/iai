@@ -28,15 +28,16 @@ X=[ (,u,impl,u,)]
 */
 
 s(Length) --> expr(Length).
-expr([_]) --> pred.
-expr([_,_,_|Tail]) --> ['not'], ['('], expr(Tail), [')'].
-expr([_,_,_|Tail]) --> ['('], expr(Tail), ['and'], expr(Tail), [')'].
-expr([_,_,_|Tail]) --> ['('], expr(Tail), ['or'], expr(Tail), [')'].
-expr([_,_,_|Tail]) --> ['('], expr(Tail), ['impl'], expr(Tail), [')'].
+expr([]) --> pred.
+expr([_|Tail]) --> ['not'], expr(Tail).
+expr([_|Tail]) --> {append(TailA, TailB, Tail)}, ['('], expr(TailA), ['and'],  expr(TailB), [')'].
+expr([_|Tail]) --> {append(TailA, TailB, Tail)}, ['('], expr(TailA), ['or'],   expr(TailB), [')'].
+expr([_|Tail]) --> {append(TailA, TailB, Tail)}, ['('], expr(TailA), ['impl'], expr(TailB), [')'].
 
 pred --> ['u']; ['v']; ['w'].
 
 
 enumerate(X) :-
-	s(_, X, []).
+	append(L, [], _),
+	s(L, X, []).
 	

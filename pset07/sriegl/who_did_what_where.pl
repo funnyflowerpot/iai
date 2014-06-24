@@ -44,74 +44,110 @@
 
 
 
-event(aramis, _, _).
-event(pathos, _, _).
-event(athos, _, _).
-event(_, clean, _).
-event(_, meet, _).
-event(_, duel, _).
-event(_, _, hotel).
-event(_, _, jardin).
-event(_, _, estate).
-
-
-event_not(Who, What, Where) :- event(Who, What, Where), !, fail.
-event_not(_, _, _).
-
-
-% "If either Aramis or Athos was in the Jardin, 
-%   then someone cleaned his musket in the hotel."
-%event(_, musket, hotel) :-
-%	event(aramis, _, jardin); event(athos, _, jardin).
-event_not(aramis, _, jardin) :- event_not(_, musket, hotel).
-event_not(athos, _, jardin) :- event_not(_, musket, hotel).
-
-% "Neither was Pathos involved in a duel 
-%   nor did the duel take place in the Jardin."
-event_not(pathos, duel, _).
-event_not(_, duel, jardin).
-
-% "Aramis lost his musket some days ago, 
-%   and he was certainly not in the hotel."
-event_not(aramis, clean, _).
-%event_not(aramis, duel, _).
-event_not(aramis, _, hotel).
-
-% "If Pathos cleaned his musket 
-%   then Constance has not been to the Jardin."
-event_not(_, meet, jardin) :- event(pathos, clean, _).
-
-% "Cardinal Richelieu has been seen in Villier's estate 
-%   if and only if Pathos was in Villier's estate."
-% (problematic iff, try to find a workaround)
-% It follows, that iff Pathos was in estate, he was duelling. Speaking for
-% the estate, we can only have a duelling Pathos, or: no Pathos and no duel.
-% Because of the iff we will not have only a Pathos or only a duel without
-% the respective other one (again: valid for estate). 
-% We can not express "a; b." in Prolog. But we can exclude invalid facts.
-event_not(pathos, clean, estate).
-event_not(pathos, meet, estate).
-event_not(aramis, duel, estate).
-event_not(athos, duel, estate).
-
-% "Women are not allowed in Treville's Hotel."
-event_not(_, meet, hotel).
-
-
+% To find all (here: one) possible solutions that meet the given constraints,
+% we create a "database" Events, i.e. a data structure. During that particular 
+% spring evening, three events happened and these events are listed in the 
+% database Events. Each event contains a name, an action and a place, in this 
+% order. The database is assumed to be correct and validity is checked by 
+% proving the given constraints above, formulated in propositional logic only
+% represented by conjunctions, disjunctions and negations.
+% 
 who_did_what_where([AramisAction, AramisPlace],
                    [PathosAction, PathosPlace],
                    [AthosAction, AthosPlace]) :-
-	event(athos, AthosAction, AthosPlace),
-	event(pathos, PathosAction, PathosPlace),
-	event(aramis, AramisAction, AramisPlace),
-%	not(event_not(aramis, AramisAction, AramisPlace)),
-%	not(event_not(pathos, PathosAction, PathosPlace)),
-%	not(event_not(athos, AthosAction, AthosPlace)),
-	AramisAction \= PathosAction,
-	AramisPlace \= PathosPlace,
-	PathosAction \= AthosAction,
-	PathosPlace \= AthosPlace,
-	AthosAction \= AramisAction,
-	AthosPlace \= AramisPlace.
+
+	member([_, _, jardin], Events),
+	member([_, _, hotel], Events),
+	member([_, _, estate], Events),
+
+	% Until here, we have set the minimal number of entries in our database
+	% Events. With length/2 we are additionally limiting the maximal number
+	% of entries. Otherwise new entries might be added by not fitting
+	% constraints below and we might get caught in a loop.
+	length(Events, 3), 
 	
+	% If we would have to backtrack beyond this point, then we won't find a
+	% solution. Therefore, we have a green cut here.
+	!,
+
+	member([_, clean, _], Events),
+	member([_, meet, _], Events),
+	member([_, duel, _], Events),
+
+	member([athos, AthosAction, AthosPlace], Events),
+	member([pathos, PathosAction, PathosPlace], Events),
+	member([aramis, AramisAction, AramisPlace], Events),
+
+	% We must not include \=/2 predicates here to guarantee different actions
+	% and places for each musketeer. Since each person is contained in the
+	% database, each person must appear at least once and due to the limited 
+	% amount of entries in the database, each person can only appear once at
+	% most. The same holds for actions and places.
+
+	% Convert natural language statements into propositional logic statements.
+	% Since these statements are ought to act as constraints within this
+	% predicate, we have to represent implications as disjunction including 
+	% negated antecedent.
+
+	% "If either Aramis or Athos was in the Jardin, 
+	%   then someone cleaned his musket in the hotel."
+	% (RJ | AJ ) -> CH
+	% -(RJ | AJ) | CH
+	% (-RJ & -AJ) | CH
+	( % or
+	  ( % and
+	    not(member([aramis, _, jardin], Events)), 
+	    not(member([athos, _, jardin], Events))); 
+	  member([_, clean, hotel], Events)
+	),
+	
+	% "Neither was Pathos involved in a duel 
+	%   nor did the duel take place in the Jardin."
+	% -PD & - DJ
+	( % and
+	  not(member([pathos, duel, _], Events)),
+  	  not(member([_, duel, jardin], Events))
+	),
+	
+	% "Aramis lost his musket some days ago, 
+	%   and he was certainly not in the hotel."
+	% -RC & -RH
+	( % and
+	  not(member([aramis, clean, _], Events)),
+	  %not(member([aramis, duel, _], Events)),
+	  not(member([aramis, _, hotel], Events))
+	),
+	
+	% "If Pathos cleaned his musket 
+	%   then Constance has not been to the Jardin."
+	% PC -> MJ
+	% -PC | -MJ
+	( % or
+  	  not(member([pathos, clean, _], Events));
+  	  not(member([_, meet, jardin], Events))
+	),
+	
+	% "Cardinal Richelieu has been seen in Villier's estate 
+	%   if and only if Pathos was in Villier's estate."
+	% DE <-> PE
+	% (DE -> PE) & (PE -> DE)
+	% (-DE | PE) & (-PE | DE)
+	( % and
+	  ( % or
+  	    not(member([_, duel, estate], Events));
+	    member([pathos, _, estate], Events)
+	  ), ( % or
+	    not(member([pathos, _, estate], Events));
+  	    member([_, duel, estate], Events)
+	  )
+	),
+	
+	% "Women are not allowed in Treville's Hotel."
+	(
+	  not(member([_, meet, hotel], Events))
+	),
+
+	% yeah, we did it B-)
+	true.
+
 	

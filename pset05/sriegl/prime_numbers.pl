@@ -62,13 +62,13 @@ prime(TheNumber) :-
 %   predicate and the prime/2 in the second column reforse to the first.
 %
 %
-%   prime([2],       PN)  -->  prime([2],       2)  -->  Output: "PN = 2"
+%   prime(      [2], PN)  -->  prime(      [2], 2)  -->  Output: "PN = 2"
 %         |
 %         V
-%   prime([7,5],     PN)  -->  prime([7,5],     3)  -->  Output: "PN = 3"
+%   prime(    [3,2], PN)  -->  prime(    [3,2], 3)  -->  Output: "PN = 3"
 %         |
 %         V
-%   prime([7,5,3],   PN)  -->  prime([7,5,3],   5)  -->  Output: "PN = 5"
+%   prime(  [5,3,2], PN)  -->  prime(  [5,3,2], 5)  -->  Output: "PN = 5"
 %         |
 %         V
 %   prime([7,5,3,2], PN)  -->  prime([7,5,3,2], 7)  -->  Output: "PN = 7"

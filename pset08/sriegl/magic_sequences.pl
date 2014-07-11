@@ -38,113 +38,124 @@ doit :-
 
 doit.
 
-%-------------------------------------------------
-% magic sequence of length N
+
+%
+% A usual test run:
+%
+/*
+?- time(doit).
+0:[]
+4:[1,2,1,0]
+4:[2,0,2,0]
+5:[2,1,2,0,0]
+7:[3,2,1,1,0,0,0]
+8:[4,2,1,0,1,0,0,0]
+% 204,982 inferences, 0,048 CPU in 0,048 seconds (100% CPU, 4237052 Lips)
+true.
+*/
+
+
 % magic_sequence(+N,-Sequence)
-
-
-
+% Instantiates a magic sequence for a given length N. The strategy is
+% generate and test.
 magic_sequence(Length, Sequence) :-
+  % set length for sequence to be returned
   length(Sequence, Length),
-  contains_ints(Sequence, Length, Length),
-%  sum_list(Sequence, Length),
-%  check_items(Sequence, Sequence, 0).
-  check_items4(Sequence, Sequence, 0, Length).
+  % generate some sequence
+  fill_ints(Sequence, Length),
+  % test sequence on magic-ness
+  check_items(Sequence, Sequence, 0, Length).
 
 
-bam :-
-  between(0,8,N),
-  length(Sequence, N),
-  contains_ints(Sequence, N, N).
-  
-  
-contains_ints([], _, 0).
-contains_ints(Sequence, Length, AmountLeft) :-
-  append(FirstElements, [LastElement], Sequence), !,
-  between(0, AmountLeft, LastElement),
-  NewAmountLeft is AmountLeft - LastElement,
-  contains_ints(FirstElements, Length, NewAmountLeft).
+% fill_ints(?Sequence, +Amount)
+% Distribute summands of a total Amount to elements of a Sequence. The length
+% of Sequence should be bound, for receiving more than one instantion of
+% Sequence.
+%
+% The predicate works as follows: Subtract a number from amount and
+% instantiate the head of the sequence with that number. Use this predicate
+% recursively with the tail of the sequence and the remaining amount. Allow
+% successful prove of predicate only if the predicate gets called with an
+% empty sequence and no amount (i.e. Amount=0) left to distribute.
+%
+% An example output for "?- length(X, 3), fill_ints(X,4)." would be:
+%   X = [4, 0, 0] ; X = [3, 1, 0] ; X = [2, 2, 0] ; X = [1, 3, 0] ; 
+%   X = [0, 4, 0] ; X = [3, 0, 1] ; X = [2, 1, 1] ; X = [1, 2, 1] ; 
+%   X = [0, 3, 1] ; X = [2, 0, 2] ; X = [1, 1, 2] ; X = [0, 2, 2] ; 
+%   X = [1, 0, 3] ; X = [0, 1, 3] ; X = [0, 0, 4] ; false.
+%
+% (If the length of the Sequence is bound, the "next best" length of 1 will
+% be assumed. So "?- fill_ints(X, 3)." would yield "X = [3]".) 
 
-
-contains_ints2([], _, 0).
-contains_ints2([SequenceHead|SequenceTail], Length, AmountLeft) :-
+% only allow successful prove if no items in sequence left _and_ nothing left
+% to distribute
+fill_ints([], 0).
+fill_ints([SequenceHead|SequenceTail], AmountLeft) :-
+  % _generate_ the new, diminished amount
   between(0, AmountLeft, SequenceHead),
+  % head of sequence equals difference of former amount and new amount 
   NewAmountLeft is AmountLeft - SequenceHead,
-  contains_ints(SequenceTail, Length, NewAmountLeft).
+  % continue for other sequence items and remaining amount
+  fill_ints(SequenceTail, NewAmountLeft).
 
 
-%contains_ints3(Sequence, Length) :-
-  
+% select_n(+Elem, +List1, -List2, ?N)
+% Like the built-in predicate select/3, but allow for N selections instead of
+% only one. See the documentation of select/3 for details. B-) :D
+%
+% Cuts were used to optimize inference time.
+%
+% (There are built-in predicates, that might do similar things, but this
+% implementation turned out to be more efficient than tested ones.)
 
-% Index: What to be counted.
-% CurrentAmount: Amount of what to be counted.
-check_items([], _, _).
-check_items([CurrentAmount|ItemsLeft], Sequence, Index) :-
-  count(Index, Sequence, CurrentAmount),
-%  writef('%w, %w, %w\n', [[CurrentAmount|ItemsLeft], Sequence, Index]),
-  OtherIndex is Index + 1,
-  !, check_items(ItemsLeft, Sequence, OtherIndex).
-
-
-check_items1(_, [], _).
-check_items1(Sequence, WorkingList, Index) :-
-  nth0(Index, Sequence, Element),
-  delete(WorkingList, Element, NewWorkingList),
-  NewIndex is Index + 1, !,
-  check_items(Sequence, NewWorkingList, NewIndex).
-
-
-delete_n_times(List, _, 0, List).
-delete_n_times(List, Elem, N, ResultList) :-  
-  NMinusOne is N - 1,
-  select(Elem, List, ReducedList), !,
-  delete_n_times(ReducedList, Elem, NMinusOne, ResultList).
-
-
-%select_n(+Elem, +List1, -List2, ?N)
+% True, since nothing to do.
 select_n(_, [], [], 0).
+% If the Elem in interest is the head of List1, skip it (i.e. Elem is the
+% head of argument "[Elem|List1Rest]", but not of argument "List2") and 
+% continue with the other elements. Increment counter N of skipped elements.
 select_n(Elem, [Elem|List1Rest], List2, NPlusOne) :-
   !, select_n(Elem, List1Rest, List2, N),
   NPlusOne is N + 1.
+% If the Elem in interest is not the head of List1, let the head of List1
+% also appear as the head of List2 and continue.
+% Since the former definition of select_n/4 handles equality of Elem with
+% head of List1 and cuts are used, we do not have to check on inequality of
+% Elem and OtherElem.
 select_n(Elem, [OtherElem|List1Rest], [OtherElem|List2Rest], N) :-
-  OtherElem \= Elem,
   !, select_n(Elem, List1Rest, List2Rest, N).
  
  
-check_items2(_, [], Length, Length).
-check_items2([SequenceHead|SequenceTail], WorkingList, Index, Length) :-
-  delete_n_times(WorkingList, Index, SequenceHead, ModifiedWorkingList),
-  IndexPlusOne is Index + 1, !,
-  check_items2(SequenceTail, ModifiedWorkingList, IndexPlusOne, Length).
+% check_items(+Sequence, +ItemsToCheck, +Index, +Length)
+% True, if Sequence is a magic sequence. ItemsToCheck should be initialized
+% with the same Variable as Sequence. Index should be initialized with 0 and
+% Length with the length of Sequence. An interface predicate was not intro-
+% duced, since check_items/4 is an internal helper predicate for doit/0 and
+% more predicates means mores inferences, which we want to minimize. ;-)
+%
+% A Sequence is magical, if it holds that for all indexes of elements in the
+% sequence, an index appears exactly n times, where n is the value in the 
+% sequence, denoted by the index. Indices start with 0. This property gets
+% checked for the whole sequence, starting with sequence head and proceeding
+% by recursion.
+%
+% If one index fulfills the magic property, all values denoted by the index
+% get removed from a "WorkSequence", that must be empty in the same predicate
+% when the running Index got incremented to reach Length.
 
-check_items3(_, [], Length, Length).
-check_items3([SequenceHead|SequenceTail], ItemsToCheck, Index, Length) :-
-  delete_all(ItemsToCheck, Index, RemainingItemsToCheck, SequenceHead),
-  IndexPlusOne is Index + 1,
-  !, check_items3(SequenceTail, RemainingItemsToCheck, IndexPlusOne, Length).
-
-
-check_items4(_, [], Length, Length).
-check_items4([SequenceHead|SequenceTail], ItemsToCheck, Index, Length) :-
+% Sequence is magical iff no items are left to check and we have checked all
+% available indexes (i.e. the running Index was increased until it is equal
+% to Length).
+check_items(_, [], Length, Length).
+% Check if the head of sequence fulfills the "magic property", as stated
+% above. Index always determines the index of the current SequenceHead.
+check_items([SequenceHead|SequenceTail], ItemsToCheck, Index, Length) :-
+  % RemainingItemsToCheck is the result, when all elements that unify with
+  % Index get removed from ItemsToCheck and the number of removed elements
+  % is SequenceHead
+  % e.g.: if "?- select_n(2, [2,1,2,0,0], RemainingItemsToCheck, 2)." would
+  % yield "RemainingItemsToCheck = [1,0,0]".
+  % admittedly, the variable naming here is ugly, but so is the definition of
+  % magic sequences too
   select_n(Index, ItemsToCheck, RemainingItemsToCheck, SequenceHead),
   IndexPlusOne is Index + 1,
-  !, check_items4(SequenceTail, RemainingItemsToCheck, IndexPlusOne, Length).
-
-%
-% count(+Needle, +Haystack, ?Amount)
-% Count the amount of needles (single item) in a haystack (list).
-% Can be used to verify the amount of needles in a haystack.
-% Green cuts were used to optimize.
-%
-
-% There will be nothing to be found in an empty list.
-count(_, [], 0).
-% If we found a needle, increase a counter.
-count(Needle, [Needle|HaystackRest], Amount) :-
-  count(Needle, HaystackRest, OtherAmount), !,
-  Amount is OtherAmount + 1.
-% Current item is not a needle, skip.
-count(Needle, [SomeHay|HaystackRest], Amount) :-
-  Needle \= SomeHay, !,
-  count(Needle, HaystackRest, Amount).
-
+  !, check_items(SequenceTail, RemainingItemsToCheck, IndexPlusOne, Length).
